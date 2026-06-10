@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Go Borneo - Dashboard Mitra</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <style>
         :root {
             --primary: #3B82F6;
@@ -21,6 +23,7 @@
             --radius-md: 16px;
             --shadow-modern: 0 16px 36px rgba(15, 23, 42, 0.08);
             --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.03);
+            --z-index-crop: 20000;
         }
 
         html, body {
@@ -305,6 +308,39 @@
         }
         .capsule-btn img { width: 20px; height: 20px; object-fit: contain; border-radius: 4px; }
 
+        /* MODAL CROP GAMBAR INTERAKTIF */
+        .crop-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px);
+            display: none; flex-direction: column; z-index: var(--z-index-crop);
+            box-sizing: border-box;
+        }
+        .crop-modal-overlay.open { display: flex; }
+        
+        .crop-header {
+            padding: 16px 20px; background: rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+            color: white; border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .crop-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+        .crop-header i { font-size: 20px; cursor: pointer; opacity: 0.8; }
+        .crop-header i:hover { opacity: 1; }
+
+        .crop-body {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; padding: 20px; box-sizing: border-box;
+        }
+        #imageToCrop { max-width: 100%; max-height: 100%; display: block; }
+
+        .crop-footer {
+            padding: 16px 20px 30px 20px; background: rgba(0,0,0,0.3);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex; gap: 12px; box-sizing: border-box;
+        }
+        
+        /* Overriding Cropper styles for iOS smooth scrolling/dragging */
+        .cropper-container { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+
     </style>
 </head>
 <body>
@@ -366,6 +402,20 @@
                 <div style="width:100%; text-align:center; color:var(--text-muted); font-size:14px;"><i class="fa-solid fa-circle-notch fa-spin"></i> Memuat data fasilitas...</div>
             </div>
             <button class="btn-submit" style="margin: 0;" onclick="saveSelectedFacilities()">Terapkan Fasilitas</button>
+        </div>
+    </div>
+
+    <div id="cropModalOverlay" class="crop-modal-overlay">
+        <div class="crop-header">
+            <h3>Sesuaikan Gambar</h3>
+            <i class="fa-solid fa-xmark" onclick="cancelCrop()"></i>
+        </div>
+        <div class="crop-body">
+            <img id="imageToCrop" src="">
+        </div>
+        <div class="crop-footer">
+            <button class="btn-alert-secondary" style="flex: 1; border-radius: 12px; background: rgba(255,255,255,0.1); color: white;" onclick="cancelCrop()">Batal</button>
+            <button class="btn-submit" style="flex: 2; margin: 0; border-radius: 12px; background: var(--primary-gradient);" onclick="performCrop()">Terapkan</button>
         </div>
     </div>
 
@@ -434,13 +484,13 @@
                 </div>
                 
                 <div class="form-group">
-                    <label>Upload Logo Perusahaan</label>
+                    <label>Upload Logo Perusahaan (Kotak)</label>
                     <div class="custom-file-upload" style="position: relative; overflow: hidden;">
                         <i class="fa-solid fa-image"></i>
                         <span>Pilih File Logo</span>
-                        <input type="file" id="compLogoFile" accept="image/*" onclick="this.value=''" onchange="handleImagePreview(this, 'previewCompLogo', 'compLogo')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; -webkit-tap-highlight-color: transparent;">
+                        <input type="file" id="compLogoFile" accept="image/jpeg, image/png" onclick="this.value=''" onchange="prepareImageForCrop(this, 'compLogo')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; -webkit-tap-highlight-color: transparent;">
                     </div>
-                    <img id="previewCompLogo" class="img-preview">
+                    <img id="previewCompLogo" class="img-preview" style="width: 100px; height: 100px; object-fit: cover; border-radius: 12px; margin-top: 15px;">
                 </div>
 
                 <div class="form-group"><label>No. HP Kantor Resmi</label><input type="tel" id="compHp" placeholder="Nomor telepon operasional kantor"></div>
@@ -560,13 +610,13 @@
                 <div class="form-group"><label>Kapasitas Kursi</label><input type="number" id="addKapasitas" placeholder="Jumlah maksimal penumpang"></div>
                 
                 <div class="form-group">
-                    <label>Foto Kendaraan</label>
+                    <label>Foto Kendaraan (Kotak)</label>
                     <div class="custom-file-upload" style="position: relative; overflow: hidden;">
                         <i class="fa-solid fa-camera"></i>
                         <span>Pilih Foto Armada</span>
-                        <input type="file" id="addFotoFile" accept="image/*" onclick="this.value=''" onchange="handleImagePreview(this, 'previewAddFoto', 'armadaFoto')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; -webkit-tap-highlight-color: transparent;">
+                        <input type="file" id="addFotoFile" accept="image/jpeg, image/png" onclick="this.value=''" onchange="prepareImageForCrop(this, 'armadaFoto')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; -webkit-tap-highlight-color: transparent;">
                     </div>
-                    <img id="previewAddFoto" class="img-preview">
+                    <img id="previewAddFoto" class="img-preview" style="width: 100%; height: 180px; object-fit: cover; border-radius: 12px; margin-top: 15px;">
                 </div>
 
                 <div class="form-group"><label>Harga Tiket (Rp)</label><input type="number" id="addHarga" placeholder="Tanpa titik (Contoh: 150000)"></div>
@@ -598,6 +648,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script>
         const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz9oI7WVGzV2nrgAyW965T_2XKw7uxHYkU13ouJVlb8iRzmnVXEPGhDvqtNjxOnKQsYLg/exec"; 
 
@@ -613,8 +664,13 @@
         let globalFacilitiesDatabase = [];
         let selectedFasilitasArray = [];
 
+        // VARIABEL STATE UNTUK MENAMPUNG BASE64 GAMBAR HASIL CROP
         let base64CompLogo = "";
         let base64ArmadaFoto = "";
+
+        // STATE UNTUK CROPPER
+        let cropperInstance = null;
+        let currentCropType = ""; // 'compLogo' atau 'armadaFoto'
 
         window.onload = function() {
             const savedSession = localStorage.getItem('goBorneo_partner_session');
@@ -634,21 +690,113 @@
         function cleanSpace(el) { el.value = el.value.replace(/\s/g, ''); }
         function updateCharCounter(el) { document.getElementById('descCounter').innerText = `${el.value.length}/50`; }
 
-        // FUNGSI PREVIEW: Reset dipindahkan langsung ke pemicu klik inline agar siklus onchange murni terbaca WebView
-        function handleImagePreview(inputElement, previewImgId, type) {
-            const preview = document.getElementById(previewImgId);
+        // ================= FITUR BARU: SISTEM CROP GAMBAR INTERAKTIF =================
+
+        // 1. Persiapkan Gambar (Baca file & buka modal crop)
+        function prepareImageForCrop(inputElement, type) {
+            currentCropType = type;
             if (inputElement.files && inputElement.files[0]) {
+                const file = inputElement.files[0];
+                
+                // Validasi tipe file
+                if (!file.type.startsWith('image/')) {
+                    showAlert("Format Salah", "Mohon pilih file gambar (JPG/PNG).", "fa-file-image", true);
+                    return;
+                }
+
+                showLoading(true); // Tampilkan loader sebentar saat membaca file
+
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    preview.src = e.target.result; 
-                    preview.style.display = 'block';
+                    // Masukkan sumber gambar ke elemen img di dalam modal crop
+                    const imageToCrop = document.getElementById('imageToCrop');
+                    imageToCrop.src = e.target.result;
                     
-                    if(type === 'compLogo') base64CompLogo = e.target.result;
-                    if(type === 'armadaFoto') base64ArmadaFoto = e.target.result;
+                    // Buka Modal Crop
+                    openCropModal();
                 }
-                reader.readAsDataURL(inputElement.files[0]);
+                reader.readAsDataURL(file);
             }
         }
+
+        // 2. Buka Modal & Inisialisasi Cropper.js
+        function openCropModal() {
+            showLoading(false); // Matikan loader utama
+            document.getElementById('cropModalOverlay').classList.add('open');
+            
+            const image = document.getElementById('imageToCrop');
+            
+            // Hancurkan instance cropper lama jika ada
+            if (cropperInstance) {
+                cropperInstance.destroy();
+            }
+
+            // Inisialisasi Cropper.js baru
+            cropperInstance = new Cropper(image, {
+                aspectRatio: 1, // KUNCI: Paksa rasio kotak (1:1)
+                viewMode: 1, // Batasi box crop di dalam area gambar
+                autoCropArea: 0.8, // Ukuran awal box crop (80% gambar)
+                responsive: true,
+                restore: false,
+                guides: true, // Tampilkan garis pandu rule of thirds
+                center: true, // Tampilkan indikator tengah
+                highlight: false, // Matikan highlight area luar box
+                cropBoxMovable: true, // Box crop bisa digeser
+                cropBoxResizable: true, // Box crop bisa diubah ukuran (tetap 1:1)
+                toggleDragModeOnDblclick: false, // Matikan drag mode ganda
+                minCropBoxWidth: 100, // Ukuran minimal box
+                minCropBoxHeight: 100,
+            });
+        }
+
+        // 3. Batalkan Crop
+        function cancelCrop() {
+            document.getElementById('cropModalOverlay').classList.remove('open');
+            if (cropperInstance) {
+                cropperInstance.destroy();
+                cropperInstance = null;
+            }
+            // Bersihkan src agar tidak berat
+            document.getElementById('imageToCrop').src = "";
+        }
+
+        // 4. Lakukan Crop & Ambil Data Base64
+        function performCrop() {
+            if (!cropperInstance) return;
+
+            showLoading(true); // Tampilkan loader saat memproses crop
+
+            // Ambil canvas hasil crop (tentukan ukuran output agar tidak terlalu besar)
+            // Ukuran 500x500 sudah cukup tajam untuk logo/preview mobile tanpa membebani GAS
+            const canvas = cropperInstance.getCroppedCanvas({
+                width: 500,
+                height: 500,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+
+            // Ubah canvas menjadi Base64 string (gunakan jpeg untuk kompresi lebih baik)
+            const croppedBase64Data = canvas.toDataURL('image/jpeg', 0.85); // Kualitas 85%
+
+            // Masukkan data ke variabel state & preview yang sesuai
+            if (currentCropType === 'compLogo') {
+                base64CompLogo = croppedBase64Data;
+                const preview = document.getElementById('previewCompLogo');
+                preview.src = croppedBase64Data;
+                preview.style.display = 'block';
+            } else if (currentCropType === 'armadaFoto') {
+                base64ArmadaFoto = croppedBase64Data;
+                const preview = document.getElementById('previewAddFoto');
+                preview.src = croppedBase64Data;
+                preview.style.display = 'block';
+            }
+
+            // Tutup modal
+            cancelCrop();
+            showLoading(false);
+        }
+
+        // =============================================================================
 
         function toggleDropdown() { document.getElementById("serviceTypeOptions").classList.toggle("open"); }
         
@@ -902,7 +1050,10 @@
             document.getElementById('addTujuan').value = "";
             document.getElementById('addJamB').value = "";
             document.getElementById('addJamS').value = "";
+            
+            // Reset Input File & Preview
             document.getElementById('addFotoFile').value = "";
+            document.getElementById('previewAddFoto').src = "";
             document.getElementById('previewAddFoto').style.display = 'none';
             
             base64ArmadaFoto = "";
@@ -967,6 +1118,11 @@
             if(!namaPerusahaan || !deskripsiPerusahaan || !noHpPerusahaan || !alamatPerusahaan) {
                 showAlert("Data Belum Lengkap", "Mohon isi seluruh kelengkapan profil perusahaan.", "fa-building", true); return;
             }
+            
+            if(!base64CompLogo) {
+                 showAlert("Logo Wajib", "Mohon upload dan sesuaikan logo perusahaan Anda.", "fa-image", true); return;
+            }
+
             showLoading(true);
 
             try {
@@ -1051,6 +1207,10 @@
             if(!jenis || colText.includes("Pilih Tipe") || !merk || !fasilitas || !kapasitas || !harga || !asal || !tujuan || !jamBerangkat || !jamSampai) {
                 showAlert("Data Belum Lengkap", "Harap isi seluruh spesifikasi armada termasuk fasilitas dan jadwal.", "fa-triangle-exclamation", true); return;
             }
+            
+            if(!base64ArmadaFoto) {
+                showAlert("Foto Wajib", "Mohon upload dan sesuaikan foto armada Anda.", "fa-camera", true); return;
+            }
 
             showLoading(true);
 
@@ -1078,7 +1238,16 @@
             document.getElementById('loginUser').value = ""; document.getElementById('loginPass').value = "";
             document.getElementById('compDesc').value = ""; document.getElementById('descCounter').innerText = "0/50";
             
-            base64CompLogo = ""; base64ArmadaFoto = "";
+            // Reset File Inputs & Previews global
+            document.getElementById('compLogoFile').value = "";
+            document.getElementById('previewCompLogo').src = "";
+            document.getElementById('previewCompLogo').style.display = "none";
+            base64CompLogo = ""; 
+            
+            base64ArmadaFoto = "";
+            
+            // Pastikan Cropper hancur jika logout saat cropping (jarang terjadi tapi aman)
+            if(cropperInstance) cancelCrop();
             
             switchSubView('layanan'); switchPage('pageLogin');
         }
