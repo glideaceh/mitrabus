@@ -435,11 +435,11 @@
                 
                 <div class="form-group">
                     <label>Upload Logo Perusahaan</label>
-                    <div class="custom-file-upload" onclick="document.getElementById('compLogoFile').click()">
+                    <div class="custom-file-upload" style="position: relative; overflow: hidden;">
                         <i class="fa-solid fa-image"></i>
                         <span>Pilih File Logo</span>
+                        <input type="file" id="compLogoFile" accept="image/*" onclick="this.value=''" onchange="handleImagePreview(this, 'previewCompLogo', 'compLogo')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; -webkit-tap-highlight-color: transparent;">
                     </div>
-                    <input type="file" id="compLogoFile" accept="image/*" style="display: none;" onchange="handleImagePreview(this, 'previewCompLogo', 'compLogo')">
                     <img id="previewCompLogo" class="img-preview">
                 </div>
 
@@ -561,11 +561,11 @@
                 
                 <div class="form-group">
                     <label>Foto Kendaraan</label>
-                    <div class="custom-file-upload" onclick="document.getElementById('addFotoFile').click()">
+                    <div class="custom-file-upload" style="position: relative; overflow: hidden;">
                         <i class="fa-solid fa-camera"></i>
                         <span>Pilih Foto Armada</span>
+                        <input type="file" id="addFotoFile" accept="image/*" onclick="this.value=''" onchange="handleImagePreview(this, 'previewAddFoto', 'armadaFoto')" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; -webkit-tap-highlight-color: transparent;">
                     </div>
-                    <input type="file" id="addFotoFile" accept="image/*" style="display: none;" onchange="handleImagePreview(this, 'previewAddFoto', 'armadaFoto')">
                     <img id="previewAddFoto" class="img-preview">
                 </div>
 
@@ -613,7 +613,6 @@
         let globalFacilitiesDatabase = [];
         let selectedFasilitasArray = [];
 
-        // VARIABEL STATE BARU UNTUK MENAMPUNG BASE64 GAMBAR SECARA AMAN DI WEBVIEW
         let base64CompLogo = "";
         let base64ArmadaFoto = "";
 
@@ -635,7 +634,7 @@
         function cleanSpace(el) { el.value = el.value.replace(/\s/g, ''); }
         function updateCharCounter(el) { document.getElementById('descCounter').innerText = `${el.value.length}/50`; }
 
-        // PEMBARUAN SISTEM PREVIEW GAMBAR - AGAR AKTIF TERUS-MENERUS DI JAGEL & SPCK EDITOR
+        // FUNGSI PREVIEW: Reset dipindahkan langsung ke pemicu klik inline agar siklus onchange murni terbaca WebView
         function handleImagePreview(inputElement, previewImgId, type) {
             const preview = document.getElementById(previewImgId);
             if (inputElement.files && inputElement.files[0]) {
@@ -644,12 +643,8 @@
                     preview.src = e.target.result; 
                     preview.style.display = 'block';
                     
-                    // Simpan data base64 ke variabel state global murni
                     if(type === 'compLogo') base64CompLogo = e.target.result;
                     if(type === 'armadaFoto') base64ArmadaFoto = e.target.result;
-                    
-                    // KUNCI UTAMA: Kosongkan nilai input file agar file-trigger onchange tetap mendeteksi klik berikutnya
-                    inputElement.value = '';
                 }
                 reader.readAsDataURL(inputElement.files[0]);
             }
@@ -725,7 +720,6 @@
             }
         }
 
-        // Penanganan edit field dummy
         function triggerEdit(fieldName) { showAlert("Edit " + fieldName, `Fitur pembaruan data ${fieldName} langsung dari aplikasi akan segera tersedia.`, "fa-pen-to-square"); }
 
         async function initCityData() {
@@ -739,9 +733,7 @@
                         return name.replace(/\b\w/g, c => c.toUpperCase()); 
                     });
                 }
-            } catch (error) { 
-                console.warn("Gagal terhubung ke Github API Wilayah.", error); 
-            }
+            } catch (error) { console.warn("Gagal terhubung ke Github API Wilayah.", error); }
         }
 
         function openRegionSelection(targetInputId) {
@@ -913,7 +905,6 @@
             document.getElementById('addFotoFile').value = "";
             document.getElementById('previewAddFoto').style.display = 'none';
             
-            // Bersihkan sisa data base64 armada
             base64ArmadaFoto = "";
         }
 
@@ -967,7 +958,6 @@
             } catch(e) { showLoading(false); showAlert("Error Script", "Koneksi gagal atau database bermasalah.", "fa-server", true); }
         }
 
-        // PENYESUAIAN PENGIRIMAN DATA UNTUK LOGO PERUSAHAAN (MENGGUNAKAN MEMORI STATE GLOBAL)
         async function handleCompanyRegister() {
             const namaPerusahaan = document.getElementById('compNama').value.trim();
             const deskripsiPerusahaan = document.getElementById('compDesc').value.trim();
@@ -1046,7 +1036,6 @@
             document.getElementById('serviceTypeSelect').style.borderColor = "var(--primary)";
         }
 
-        // PENYESUAIAN SIMPAN LAYANAN ARMADA (MENGGUNAKAN MEMORI STATE GLOBAL FOTO ARMADA)
         async function submitNewService() {
             const jenis = selectedVehicleTypeName;
             const colText = document.getElementById('selectedServiceType').innerText;
@@ -1089,7 +1078,6 @@
             document.getElementById('loginUser').value = ""; document.getElementById('loginPass').value = "";
             document.getElementById('compDesc').value = ""; document.getElementById('descCounter').innerText = "0/50";
             
-            // Bersihkan sisa berkas base64 gambar
             base64CompLogo = ""; base64ArmadaFoto = "";
             
             switchSubView('layanan'); switchPage('pageLogin');
